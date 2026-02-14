@@ -60,27 +60,79 @@ def print_board(mines, counts, revealed, flags, reveal_all=False):
     - reveal_all: if True, show mines and all numbers (final reveal)
     - '.' means unexplored cells, 'F' for flags, numbers or space (=0) for revealed cells
     """
+    RESET = "\033[0m"
+    DIM = "\033[2m"
+    BOLD = "\033[1m"
+    FG = {
+        "black": "\033[30m",
+        "red": "\033[31m",
+        "green": "\033[32m",
+        "yellow": "\033[33m",
+        "blue": "\033[34m",
+        "magenta": "\033[35m",
+        "cyan": "\033[36m",
+        "white": "\033[37m",
+        "bright_black": "\033[90m",
+        "bright_red": "\033[91m",
+        "bright_green": "\033[92m",
+        "bright_yellow": "\033[93m",
+        "bright_blue": "\033[94m",
+        "bright_magenta": "\033[95m",
+        "bright_cyan": "\033[96m",
+        "bright_white": "\033[97m",
+    }
+
+    # mapping for numbers -> color
+    num_color = {
+        1: FG["blue"],
+        2: FG["green"],
+        3: FG["red"],
+        4: FG["magenta"],
+        5: FG["yellow"],
+        6: FG["cyan"],
+        7: FG["white"],
+        8: FG["bright_black"],
+    }
+
+    # column header (colored)
     col_nums = '   ' + ' '.join(str(c+1) for c in range(board_size))
-    print(col_nums)
-    print('  +' + '--' * board_size + '+')
+    print(FG["cyan"] + col_nums + RESET)
+    print(FG["cyan"] + '  +' + '--' * board_size + '+' + RESET)
+
     for r in range(board_size):
         row_str = f"{r+1:2}|"
         for c in range(board_size):
+            cell_str = ""
             if reveal_all:
                 if (r, c) in mines:
-                    row_str += 'X '
+                    # mine in bright red, bold
+                    cell_str = BOLD + FG["bright_red"] + 'X' + RESET + " "
                 else:
-                    row_str += (f"{counts[r][c]} " if counts[r][c] > 0 else "  ")
+                    v = counts[r][c]
+                    if v == 0:
+                        cell_str = "  "
+                    else:
+                        color = num_color.get(v, FG["white"])
+                        cell_str = color + str(v) + RESET + " "
             else:
                 if (r, c) in flags:
-                    row_str += 'F '
+                    # flagged cell in yellow, bold
+                    cell_str = BOLD + FG["yellow"] + 'F' + RESET + " "
                 elif revealed[r][c]:
-                    row_str += (f"{counts[r][c]} " if counts[r][c] > 0 else "  ")
+                    v = counts[r][c]
+                    if v == 0:
+                        # revealed empty
+                        cell_str = "  "
+                    else:
+                        color = num_color.get(v, FG["white"])
+                        cell_str = color + str(v) + RESET + " "
                 else:
-                    row_str += '. '
+                    # covered cell shown as dim dot to keep '.' appearance but subdued
+                    cell_str = DIM + FG["bright_black"] + '.' + RESET + " "
+            row_str += cell_str
         row_str += '|'
         print(row_str)
-    print('  +' + '--' * board_size + '+')
+    print(FG["cyan"] + '  +' + '--' * board_size + '+' + RESET)
 
 def handle_click(r, c, counts, mines, revealed, flags):
     """
@@ -273,6 +325,44 @@ def ai_get_action(revealed, flags, counts):
                                     break
     success = heuristic_result[0]
 
+    # rule #3:
+    # look for revealed cells with 2 and less than one flag around
+    # if there is no flag and 2 unrevealed neighbors, click any of them
+    # if there is one flag and 1 unrevealed neighbor, click it
+    # if there is such a neighbor, flag it
+    if not success:
+        for cr in range(board_size):
+            for cc in range(board_size):
+                # checking that the cell contains 2
+                if revealed[cr][cc]:
+                    if counts[cr][cc] == 2:
+                        adjacent_flags_count = count_adjacent_flags(cr, cc, flags)
+                        if adjacent_flags_count == 0:
+                            # the case of 2 unrevealed neighbors and no flag
+                            unrevealed_unflagged_neighbors_count = 0
+                            cand_neighbors = neighbors(cr, cc)
+                            for (cnr, cnc) in cand_neighbors:
+                                if not revealed[cnr][cnc] and (cnr, cnc) not in flags:
+                                    unrevealed_unflagged_neighbors_count += 1
+                                    r = cnr
+                                    c = cnc
+                            if unrevealed_unflagged_neighbors_count == 2:
+                                heuristic_result = (True, 'f', r, c)
+                                break
+                        elif adjacent_flags_count == 1:
+                            # the case of 1 unrevealed neighbor and 1 flag
+                            unrevealed_unflagged_neighbors_count = 0
+                            cand_neighbors = neighbors(cr, cc)
+                            for (cnr, cnc) in cand_neighbors:
+                                if not revealed[cnr][cnc] and (cnr, cnc) not in flags:
+                                    unrevealed_unflagged_neighbors_count += 1
+                                    r = cnr
+                                    c = cnc
+                            if unrevealed_unflagged_neighbors_count == 1:
+                                heuristic_result = (True, 'f', r, c)
+                                break
+    success = heuristic_result[0]
+
     # last resort:
     # clicking randomly (if nothing better found)
     if not success:
@@ -283,9 +373,9 @@ def ai_get_action(revealed, flags, counts):
 
     print()
     if action == 'c':
-       print(f"I am clicking on ({r}, {c}) ...")
+       print(f"I am clicking on ({r+1}, {c+1}) ...")
     elif action == 'f':
-       print(f"I am flagging ({r}, {c}) ...")
+       print(f"I am flagging ({r+1}, {c+1}) ...")
 
     return action, r, c
 
