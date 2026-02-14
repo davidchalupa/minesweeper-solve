@@ -227,8 +227,7 @@ def ai_get_action(revealed, flags, counts):
     if not candidates:
         return 'q', None, None
 
-
-    # rule #1
+    # rule #1:
     # look for "corners" with only 1 unrevealed neighbor and no flags around
     # heuristic result: (success flag, action, row, column)
     heuristic_result = (False, None, None, None)
@@ -254,7 +253,28 @@ def ai_get_action(revealed, flags, counts):
                             break
     success = heuristic_result[0]
 
-    # last resort - clicking randomly (if nothing better found)
+    # rule #2:
+    # look for revealed cells with 1 and exactly one flag around
+    # if there is any unrevealed neighbor cell, we can click on it
+    if not success:
+        for cr in range(board_size):
+            for cc in range(board_size):
+                # checking that the cell contains 1
+                if revealed[cr][cc]:
+                    if counts[cr][cc] == 1:
+                        # looking for exactly 1 flag around it
+                        adjacent_flags_count = count_adjacent_flags(cr, cc, flags)
+                        if adjacent_flags_count == 1:
+                            # clicking on any candidate unrevealed neighbor (except the flagged one)
+                            cand_neighbors = neighbors(cr, cc)
+                            for (cnr, cnc) in cand_neighbors:
+                                if not revealed[cnr][cnc] and (cnr, cnc) not in flags:
+                                    heuristic_result = (True, 'c', cnr, cnc)
+                                    break
+    success = heuristic_result[0]
+
+    # last resort:
+    # clicking randomly (if nothing better found)
     if not success:
         r, c = random.choice(candidates)
         heuristic_result = (True, 'c', r, c)
