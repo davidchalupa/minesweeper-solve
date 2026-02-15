@@ -1,28 +1,23 @@
 import random
 from collections import deque
 
+from argparse import ArgumentParser
+
+from common import neighbors
+
+from action_interactive import interactive_get_action
+from action_ai_agent import ai_get_action
+
 board_size = 9
 mines_count = 12
 
-
-def neighbors(r, c):
-    """
-    Yields coordinates of all valid neighboring cells around (r, c) on the Minesweeper board.
-    """
-    for dr in (-1, 0, 1):
-        for dc in (-1, 0, 1):
-            if dr == 0 and dc == 0:
-                continue
-            rr, cc = r + dr, c + dc
-            if 0 <= rr < board_size and 0 <= cc < board_size:
-                yield rr, cc
 
 def place_mines(first_r, first_c):
     """
     Places mines after the first cell is chosen.
     """
     # exclude the first cell and its neighbours so the first click is safe
-    excluded = {(first_r, first_c)} | set(neighbors(first_r, first_c))
+    excluded = {(first_r, first_c)} | set(neighbors(board_size, first_r, first_c))
     all_positions = [(r, c) for r in range(board_size) for c in range(board_size) if (r, c) not in excluded]
     mines = set(random.sample(all_positions, mines_count))
     return mines
@@ -30,7 +25,7 @@ def place_mines(first_r, first_c):
 def compute_counts(mines):
     counts = [[0] * board_size for _ in range(board_size)]
     for (r, c) in mines:
-        for rr, cc in neighbors(r, c):
+        for rr, cc in neighbors(board_size, r, c):
             counts[rr][cc] += 1
     return counts
 
@@ -163,7 +158,7 @@ def handle_click(r, c, counts, mines, revealed, flags):
         # revealing the corresponding cell
         revealed[rr][cc] = True
         if counts[rr][cc] == 0:
-            for nr, nc in neighbors(rr, cc):
+            for nr, nc in neighbors(board_size, rr, cc):
                 if not revealed[nr][nc] and (nr, nc) not in flags:
                     q.append((nr, nc))
 
@@ -185,199 +180,6 @@ def prompt_first_click():
             return r_in - 1, c_in - 1
         except ValueError:
             print("Invalid input. Please enter two numbers between 1 and 9 separated by space.")
-
-def interactive_get_action(revealed, flags, counts):
-    """
-    Interactive action provider for the game loop.
-
-    Encapsulates all user I/O for choosing an action so the main loop works regardless of where the
-    actions come from. Validates input and only returns when a valid action is produced.
-
-    :return: tuple: (action, r, c)
-        - action: 'c' - click, 'f' - flag, 'q' - quit
-        - r, c: zero-based coordinates for 'c' and 'f' (None in case of 'q')
-    """
-    while True:
-        cmd = input("Enter command: 'c r c' to click, 'f r c' to flag/unflag, 'q' to quit: ").strip().lower()
-        if cmd == 'q':
-            return 'q', None, None
-
-        parts = cmd.split()
-        try:
-            if len(parts) == 2:
-                # accept "r c" as click
-                action = 'c'
-                r_in, c_in = int(parts[0]), int(parts[1])
-            elif len(parts) == 3:
-                action = parts[0]
-                r_in, c_in = int(parts[1]), int(parts[2])
-            else:
-                raise ValueError
-
-            if action not in ('c', 'click', 'f', 'flag'):
-                raise ValueError
-
-            if not (1 <= r_in <= board_size and 1 <= c_in <= board_size):
-                raise ValueError
-
-            r, c = r_in - 1, c_in - 1
-            # normalize action to single-letter
-            return (action[0], r, c)
-
-        except ValueError:
-            print("Invalid command. Examples: 'c 3 5', 'f 2 2', or just '3 5' to click.")
-            continue
-
-def random_get_action(revealed, flags, counts):
-    """
-    Random automated action provider.
-
-    A very "stupid" version of AI for Minesweeper.
-    """
-    # list of candidate coordinates (not yet revealed and or flagged)
-    candidates = [
-        (r, c)
-        for r in range(board_size)
-        for c in range(board_size)
-        if not revealed[r][c] and (r, c) not in flags
-    ]
-
-    if not candidates:
-        return 'q', None, None
-
-    r, c = random.choice(candidates)
-
-    print(f"I am clicking on ({r}, {c}) ...")
-
-    return 'c', r, c
-
-def count_adjacent_flags(r, c, flags):
-    """
-    Count how many flags are placed in the 8 (or less) neighbors of cell (r, c).
-    """
-    cnt = 0
-    if isinstance(flags, set):
-        for nr, nc in neighbors(r, c):
-            if (nr, nc) in flags:
-                cnt += 1
-    return cnt
-
-def ai_get_action(revealed, flags, counts):
-    """
-    An automated action provider using a few heuristics.
-
-    A much more intelligent version of AI agent for Minesweeper.
-    """
-    # list of candidate coordinates (not yet revealed and or flagged)
-    candidates = [
-        (r, c)
-        for r in range(board_size)
-        for c in range(board_size)
-        if not revealed[r][c] and (r, c) not in flags
-    ]
-
-    if not candidates:
-        return 'q', None, None
-
-    # rule #1:
-    # look for "corners" with only 1 unrevealed neighbor and no flags around
-    # heuristic result: (success flag, action, row, column)
-    heuristic_result = (False, None, None, None)
-    for cr in range(board_size):
-        for cc in range(board_size):
-            # checking that the cell contains 1
-            if revealed[cr][cc]:
-                if counts[cr][cc] == 1:
-                    # there must also be no adjacent flags already
-                    adjacent_flags_count = count_adjacent_flags(cr, cc, flags)
-                    if adjacent_flags_count == 0:
-                        # looking for exactly 1 unrevealed neighbor
-                        # this neighbor must also not have been flagged already
-                        unrevealed_cand_neighbors = 0
-                        cand_neighbors = neighbors(cr, cc)
-                        for (cnr, cnc) in cand_neighbors:
-                            if not revealed[cnr][cnc] and (cnr, cnc) not in flags:
-                                unrevealed_cand_neighbors += 1
-                                r = cnr
-                                c = cnc
-                        if unrevealed_cand_neighbors == 1:
-                            heuristic_result = (True, 'f', r, c)
-                            break
-    success = heuristic_result[0]
-
-    # rule #2:
-    # look for revealed cells with 1 and exactly one flag around
-    # if there is any unrevealed neighbor cell, we can click on it
-    if not success:
-        for cr in range(board_size):
-            for cc in range(board_size):
-                # checking that the cell contains 1
-                if revealed[cr][cc]:
-                    if counts[cr][cc] == 1:
-                        # looking for exactly 1 flag around it
-                        adjacent_flags_count = count_adjacent_flags(cr, cc, flags)
-                        if adjacent_flags_count == 1:
-                            # clicking on any candidate unrevealed neighbor (except the flagged one)
-                            cand_neighbors = neighbors(cr, cc)
-                            for (cnr, cnc) in cand_neighbors:
-                                if not revealed[cnr][cnc] and (cnr, cnc) not in flags:
-                                    heuristic_result = (True, 'c', cnr, cnc)
-                                    break
-    success = heuristic_result[0]
-
-    # rule #3:
-    # look for revealed cells with 2 and less than one flag around
-    # if there is no flag and 2 unrevealed neighbors, click any of them
-    # if there is one flag and 1 unrevealed neighbor, click it
-    # if there is such a neighbor, flag it
-    if not success:
-        for cr in range(board_size):
-            for cc in range(board_size):
-                # checking that the cell contains 2
-                if revealed[cr][cc]:
-                    if counts[cr][cc] == 2:
-                        adjacent_flags_count = count_adjacent_flags(cr, cc, flags)
-                        if adjacent_flags_count == 0:
-                            # the case of 2 unrevealed neighbors and no flag
-                            unrevealed_unflagged_neighbors_count = 0
-                            cand_neighbors = neighbors(cr, cc)
-                            for (cnr, cnc) in cand_neighbors:
-                                if not revealed[cnr][cnc] and (cnr, cnc) not in flags:
-                                    unrevealed_unflagged_neighbors_count += 1
-                                    r = cnr
-                                    c = cnc
-                            if unrevealed_unflagged_neighbors_count == 2:
-                                heuristic_result = (True, 'f', r, c)
-                                break
-                        elif adjacent_flags_count == 1:
-                            # the case of 1 unrevealed neighbor and 1 flag
-                            unrevealed_unflagged_neighbors_count = 0
-                            cand_neighbors = neighbors(cr, cc)
-                            for (cnr, cnc) in cand_neighbors:
-                                if not revealed[cnr][cnc] and (cnr, cnc) not in flags:
-                                    unrevealed_unflagged_neighbors_count += 1
-                                    r = cnr
-                                    c = cnc
-                            if unrevealed_unflagged_neighbors_count == 1:
-                                heuristic_result = (True, 'f', r, c)
-                                break
-    success = heuristic_result[0]
-
-    # last resort:
-    # clicking randomly (if nothing better found)
-    if not success:
-        r, c = random.choice(candidates)
-        heuristic_result = (True, 'c', r, c)
-
-    (success, action, r, c) = heuristic_result
-
-    print()
-    if action == 'c':
-       print(f"I am clicking on ({r+1}, {c+1}) ...")
-    elif action == 'f':
-       print(f"I am flagging ({r+1}, {c+1}) ...")
-
-    return action, r, c
 
 def run_game_loop(mines, counts, revealed, flags, get_action):
     """
@@ -401,7 +203,7 @@ def run_game_loop(mines, counts, revealed, flags, get_action):
             print_board(mines, counts, revealed, flags, reveal_all=True)
             break
 
-        action, r, c = get_action(revealed, flags, counts)
+        action, r, c = get_action(board_size, revealed, flags, counts)
         if action == 'q':
             print("Quitting. Bye!")
             break
@@ -478,4 +280,17 @@ def main_ai_agent():
     run_game_loop(mines, counts, revealed, flags, get_action=ai_get_action)
 
 if __name__ == "__main__":
-    main_ai_agent()
+    parser = ArgumentParser(
+        prog='minesweeper',
+        description='A CLI version of Minesweeper game with a possibility of AI play')
+
+    parser.add_argument('-a', '--agent',
+                        action='store_true',
+                        help='Switches on an AI agent mode (rule-based) that plays the game automatically')
+
+    args = parser.parse_args()
+
+    if args.agent:
+        main_ai_agent()
+    else:
+        main_interactive()
