@@ -258,12 +258,18 @@ def main_interactive():
     # run the main loop, injecting the interactive action provider
     run_game_loop(mines, counts, revealed, flags, get_action=interactive_get_action)
 
-def main_ai_agent():
+def main_ai_agent(random_first_click=False):
     print(f"Minesweeper (CLI) - AI mode\n  {board_size}x{board_size}, {mines_count} mines")
 
-    # first random "click" before placing the mines
-    first_r = random.randrange(board_size)
-    first_c = random.randrange(board_size)
+    # first "click" before placing the mines
+    if random_first_click:
+        # random choice
+        first_r = random.randrange(board_size)
+        first_c = random.randrange(board_size)
+    else:
+        # middle cell
+        first_r = int(board_size / 2)
+        first_c = int(board_size / 2)
 
     mines = place_mines(first_r, first_c)
     counts = compute_counts(mines)
