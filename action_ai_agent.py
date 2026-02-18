@@ -78,10 +78,11 @@ def ai_get_action(board_size, revealed, flags, counts):
     success = heuristic_result[0]
 
     # rule #3:
-    # look for revealed cells with 2 and less than one flag around
-    # if there is no flag and 2 unrevealed neighbors, click any of them
-    # if there is one flag and 1 unrevealed neighbor, click it
-    # if there is such a neighbor, flag it
+    # look for revealed cells with 2 and at most one flag around
+    # - if there is no flag and 2 unrevealed neighbors, click any of them
+    # - if there is one flag and 1 unrevealed neighbor, click it
+    # - that means we can flag any unrevealed unflagged neighbor if there are
+    #   (2 - flagged neighbors) of these
     if not success:
         for cr in range(board_size):
             for cc in range(board_size):
@@ -89,8 +90,8 @@ def ai_get_action(board_size, revealed, flags, counts):
                 if revealed[cr][cc]:
                     if counts[cr][cc] == 2:
                         adjacent_flags_count = count_adjacent_flags(board_size, cr, cc, flags)
-                        if adjacent_flags_count == 0:
-                            # the case of 2 unrevealed neighbors and no flag
+                        if adjacent_flags_count <= 1:
+                            # both cases handled in one universal rule
                             unrevealed_unflagged_neighbors_count = 0
                             cand_neighbors = neighbors(board_size, cr, cc)
                             for (cnr, cnc) in cand_neighbors:
@@ -98,11 +99,44 @@ def ai_get_action(board_size, revealed, flags, counts):
                                     unrevealed_unflagged_neighbors_count += 1
                                     r = cnr
                                     c = cnc
-                            if unrevealed_unflagged_neighbors_count == 2:
+                            if unrevealed_unflagged_neighbors_count == (2 - adjacent_flags_count):
                                 heuristic_result = (True, 'f', r, c)
                                 break
-                        elif adjacent_flags_count == 1:
-                            # the case of 1 unrevealed neighbor and 1 flag
+    success = heuristic_result[0]
+
+    # rule #4:
+    # look for revealed cells with 2 and exactly 2 flags around
+    # if there is any unrevealed neighbor cell, we can click on it
+    if not success:
+        for cr in range(board_size):
+            for cc in range(board_size):
+                # checking that the cell contains 2
+                if revealed[cr][cc]:
+                    if counts[cr][cc] == 2:
+                        # looking for exactly 2 flag around it
+                        adjacent_flags_count = count_adjacent_flags(board_size, cr, cc, flags)
+                        if adjacent_flags_count == 2:
+                            # clicking on any candidate unrevealed neighbor (except the flagged one)
+                            cand_neighbors = neighbors(board_size, cr, cc)
+                            for (cnr, cnc) in cand_neighbors:
+                                if not revealed[cnr][cnc] and (cnr, cnc) not in flags:
+                                    heuristic_result = (True, 'c', cnr, cnc)
+                                    break
+    success = heuristic_result[0]
+
+    # rule #5:
+    # look for revealed cells with 3 and at most 2 flags around
+    # similarly to rule #3: we can flag any unrevealed unflagged neighbor if there are
+    # (3 - flagged neighbors) of these
+    if not success:
+        for cr in range(board_size):
+            for cc in range(board_size):
+                # checking that the cell contains 3
+                if revealed[cr][cc]:
+                    if counts[cr][cc] == 3:
+                        adjacent_flags_count = count_adjacent_flags(board_size, cr, cc, flags)
+                        if adjacent_flags_count <= 2:
+                            # all neighborhood combinations handled in a unified way
                             unrevealed_unflagged_neighbors_count = 0
                             cand_neighbors = neighbors(board_size, cr, cc)
                             for (cnr, cnc) in cand_neighbors:
@@ -110,9 +144,29 @@ def ai_get_action(board_size, revealed, flags, counts):
                                     unrevealed_unflagged_neighbors_count += 1
                                     r = cnr
                                     c = cnc
-                            if unrevealed_unflagged_neighbors_count == 1:
+                            if unrevealed_unflagged_neighbors_count == (3 - adjacent_flags_count):
                                 heuristic_result = (True, 'f', r, c)
                                 break
+    success = heuristic_result[0]
+
+    # rule #6:
+    # look for revealed cells with 3 and exactly 3 flags around
+    # if there is any unrevealed neighbor cell, we can click on it
+    if not success:
+        for cr in range(board_size):
+            for cc in range(board_size):
+                # checking that the cell contains 3
+                if revealed[cr][cc]:
+                    if counts[cr][cc] == 3:
+                        # looking for exactly 3 flag around it
+                        adjacent_flags_count = count_adjacent_flags(board_size, cr, cc, flags)
+                        if adjacent_flags_count == 3:
+                            # clicking on any candidate unrevealed neighbor (except the flagged one)
+                            cand_neighbors = neighbors(board_size, cr, cc)
+                            for (cnr, cnc) in cand_neighbors:
+                                if not revealed[cnr][cnc] and (cnr, cnc) not in flags:
+                                    heuristic_result = (True, 'c', cnr, cnc)
+                                    break
     success = heuristic_result[0]
 
     # last resort:
