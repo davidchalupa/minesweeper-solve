@@ -7,6 +7,7 @@ from common import neighbors
 
 from action_interactive import interactive_get_action
 from action_ai_agent import ai_get_action
+from action_ai_agent import dfs_get_action
 
 board_size = 9
 mines_count = 12
@@ -285,6 +286,33 @@ def main_ai_agent(random_first_click=False):
     # run the main loop, injecting the interactive action provider
     run_game_loop(mines, counts, revealed, flags, get_action=ai_get_action)
 
+def main_dfs(random_first_click=False):
+    print(f"Minesweeper (CLI) - AI mode (DFS)\n  {board_size}x{board_size}, {mines_count} mines")
+
+    # first "click" before placing the mines
+    if random_first_click:
+        # random choice
+        first_r = random.randrange(board_size)
+        first_c = random.randrange(board_size)
+    else:
+        # middle cell
+        first_r = int(board_size / 2)
+        first_c = int(board_size / 2)
+
+    mines = place_mines(first_r, first_c)
+    counts = compute_counts(mines)
+
+    # game state trackers
+    revealed = [[False] * board_size for _ in range(board_size)]
+    flags = set()
+
+    # reveal the first cell (and flood-fill zeros)
+    safe = handle_click(first_r, first_c, counts, mines, revealed, flags)
+    assert safe, "First click should never be a mine due to placement rules."
+
+    # run the main loop, injecting the interactive action provider
+    run_game_loop(mines, counts, revealed, flags, get_action=dfs_get_action)
+
 if __name__ == "__main__":
     parser = ArgumentParser(
         prog='minesweeper',
@@ -293,10 +321,15 @@ if __name__ == "__main__":
     parser.add_argument('-a', '--agent',
                         action='store_true',
                         help='Switches on an AI agent mode (rule-based) that plays the game automatically')
+    parser.add_argument('-d', '--dfs',
+                        action='store_true',
+                        help='Switches on DFS search mode that plays the game automatically (full scan of options)')
 
     args = parser.parse_args()
 
     if args.agent:
         main_ai_agent()
+    elif args.dfs:
+        main_dfs()
     else:
         main_interactive()

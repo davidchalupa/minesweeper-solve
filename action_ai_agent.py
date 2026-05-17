@@ -14,6 +14,164 @@ def count_adjacent_flags(board_size, r, c, flags):
                 cnt += 1
     return cnt
 
+
+def dfs_get_action(board_size, revealed, flags, counts):
+    """
+    An automated action provider using Depth First Search (DFS).
+
+    It works as follows:
+    1. find the boundary of unrevealed cells
+    2. generate all valid mine permutations - safe clicks or certainty of flags
+    3. fall back to random choice if no there is a tie
+    """
+
+    # gather all unrevealed and non-flagged coordinates
+    candidates = [
+        (r, c)
+        for r in range(board_size)
+        for c in range(board_size)
+        if not revealed[r][c] and (r, c) not in flags
+    ]
+
+    if not candidates:
+        return 'q', None, None
+
+    # helper function to get valid grid neighbors
+    def get_neighbors(r, c):
+        nr_list = []
+        for dr in [-1, 0, 1]:
+            for dc in [-1, 0, 1]:
+                if dr == 0 and dc == 0:
+                    continue
+                nr, nc = r + dr, c + dc
+                if 0 <= nr < board_size and 0 <= nc < board_size:
+                    nr_list.append((nr, nc))
+        return nr_list
+
+    # identify frontier and boundary cells
+    # frontier: revealed cells that have a count > 0 and adjacent unrevealed cells
+    # boundary: unrevealed, non-flagged cells that are adjacent to a frontier cell
+    frontier_cells = []
+    boundary_cells_set = set()
+
+    for r in range(board_size):
+        for c in range(board_size):
+            if revealed[r][c] and counts[r][c] > 0:
+                unrevealed_unflagged = []
+                adj_flags = 0
+                for nr, nc in get_neighbors(r, c):
+                    if (nr, nc) in flags:
+                        adj_flags += 1
+                    elif not revealed[nr][nc]:
+                        unrevealed_unflagged.append((nr, nc))
+
+                # if this revealed cell touches unrevealed cells, it's a frontier
+                if unrevealed_unflagged:
+                    frontier_cells.append({
+                        'r': r, 'c': c,
+                        'eff_count': counts[r][c] - adj_flags,  # Remaining mines needed
+                        'neighbors': unrevealed_unflagged
+                    })
+                    for nr, nc in unrevealed_unflagged:
+                        boundary_cells_set.add((nr, nc))
+
+    boundary_cells = list(boundary_cells_set)
+
+    # map each boundary cell to the frontier cells it touches for rapid DFS validation
+    cell_to_frontiers = {cell: [] for cell in boundary_cells}
+    for f in frontier_cells:
+        for cell in f['neighbors']:
+            cell_to_frontiers[cell].append(f)
+
+    # DFS setup
+    valid_configurations = []
+    current_assignment = {}
+
+    def is_valid(cell):
+        # validate only the frontier cells affected by the newly assigned boundary cell
+        for f in cell_to_frontiers[cell]:
+            mines_assigned = 0
+            unassigned = 0
+            for n in f['neighbors']:
+                if n in current_assignment:
+                    mines_assigned += current_assignment[n]
+                else:
+                    unassigned += 1
+
+            # pruning conditions:
+            # 1. too many mines assigned
+            if mines_assigned > f['eff_count']:
+                return False
+            # 2. not enough unassigned slots left to satisfy the required mines
+            if mines_assigned + unassigned < f['eff_count']:
+                return False
+        return True
+
+    def dfs(index):
+        if index == len(boundary_cells):
+            # reached a valid assignment for the entire boundary
+            valid_configurations.append(current_assignment.copy())
+            return
+
+        cell = boundary_cells[index]
+
+        # 1. try assuming this cell is safe (0)
+        current_assignment[cell] = 0
+        if is_valid(cell):
+            dfs(index + 1)
+
+        # 2, try assuming this cell is a mine (1)
+        current_assignment[cell] = 1
+        if is_valid(cell):
+            dfs(index + 1)
+
+        # backtrack
+        del current_assignment[cell]
+
+    # execute DFS
+    if boundary_cells:
+        dfs(0)
+
+    # analyze results
+    if valid_configurations:
+        total_configs = len(valid_configurations)
+        mine_counts = {cell: 0 for cell in boundary_cells}
+
+        # tally up mine appearances across all valid universes
+        for config in valid_configurations:
+            for cell, is_mine in config.items():
+                mine_counts[cell] += is_mine
+
+        safe_cells = []
+        mine_cells = []
+
+        for cell in boundary_cells:
+            if mine_counts[cell] == 0:
+                safe_cells.append(cell)
+            elif mine_counts[cell] == total_configs:
+                mine_cells.append(cell)
+
+        # priority 1: if there are guaranteed safe cells, click one
+        if safe_cells:
+            # random tie-break
+            r, c = random.choice(safe_cells)
+            print(f"\nI am clicking on ({r + 1}, {c + 1}) [DFS 100% Safe] ...")
+            return 'c', r, c
+
+        # priority 2: If there are guaranteed mines, flag one
+        if mine_cells:
+            # random tie-break
+            r, c = random.choice(mine_cells)
+            print(f"\nI am flagging ({r + 1}, {c + 1}) [DFS 100% Mine] ...")
+            return 'f', r, c
+
+    # last resort:
+    # clicking randomly (triggered if DFS failed to find any action with 100% certainty)
+    r, c = random.choice(candidates)
+    print(f"\nI am clicking on ({r + 1}, {c + 1}) [Random Fallback] ...")
+
+    return 'c', r, c
+
 def ai_get_action(board_size, revealed, flags, counts):
     """
     An automated action provider using a few heuristics.
