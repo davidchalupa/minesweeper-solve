@@ -202,12 +202,12 @@ def run_game_loop(mines, counts, revealed, flags, get_action):
             print("\nCongratulations - all safe cells revealed! You win!")
             print("\nFinal board (revealed):\n")
             print_board(mines, counts, revealed, flags, reveal_all=True)
-            break
+            return True
 
         action, r, c = get_action(board_size, revealed, flags, counts)
         if action == 'q':
             print("Quitting. Bye!")
-            break
+            return False
 
         if action == 'f':
             # toggle flag
@@ -231,7 +231,7 @@ def run_game_loop(mines, counts, revealed, flags, get_action):
             if not safe:
                 print("\nBOOM — you clicked a mine! Game over.\n")
                 print_board(mines, counts, revealed, flags, reveal_all=True)
-                break
+                return False
             else:
                 # safe click; loop will check for win on next iteration
                 continue
