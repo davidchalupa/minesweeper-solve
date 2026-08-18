@@ -182,7 +182,7 @@ def prompt_first_click():
         except ValueError:
             print("Invalid input. Please enter two numbers between 1 and 9 separated by space.")
 
-def run_game_loop(mines, counts, revealed, flags, get_action):
+def run_game_loop(mines, counts, revealed, flags, get_action, show_board=True):
     """
     The main game loop.
 
@@ -192,19 +192,21 @@ def run_game_loop(mines, counts, revealed, flags, get_action):
     """
     # the main game loop
     while True:
-        print("\nCurrent board ('.' = covered, 'F' = flag):\n")
-        print_board(mines, counts, revealed, flags, reveal_all=False)
+        if show_board:
+            print("\nCurrent board ('.' = covered, 'F' = flag):\n")
+            print_board(mines, counts, revealed, flags, reveal_all=False)
 
         # checking the win condition
         revealed_count = sum(1 for r in range(board_size) for c in range(board_size) if revealed[r][c])
         total_to_reveal = board_size * board_size - mines_count
         if revealed_count >= total_to_reveal:
-            print("\nCongratulations - all safe cells revealed! You win!")
-            print("\nFinal board (revealed):\n")
-            print_board(mines, counts, revealed, flags, reveal_all=True)
+            if show_board:
+                print("\nCongratulations - all safe cells revealed! You win!")
+                print("\nFinal board (revealed):\n")
+                print_board(mines, counts, revealed, flags, reveal_all=True)
             return True
 
-        action, r, c = get_action(board_size, revealed, flags, counts)
+        action, r, c = get_action(board_size, revealed, flags, counts, show_board=show_board)
         if action == 'q':
             print("Quitting. Bye!")
             return False
@@ -212,14 +214,17 @@ def run_game_loop(mines, counts, revealed, flags, get_action):
         if action == 'f':
             # toggle flag
             if revealed[r][c]:
-                print("Cannot flag an already revealed cell.")
+                if show_board:
+                    print("Cannot flag an already revealed cell.")
             else:
                 if (r, c) in flags:
                     flags.remove((r, c))
-                    print(f"Removed flag at ({r+1}, {c+1}).")
+                    if show_board:
+                        print(f"Removed flag at ({r+1}, {c+1}).")
                 else:
                     flags.add((r, c))
-                    print(f"Placed flag at ({r+1}, {c+1}).")
+                    if show_board:
+                        print(f"Placed flag at ({r+1}, {c+1}).")
             # continue game loop (no immediate win/lose from flag alone)
             continue
 
@@ -229,8 +234,9 @@ def run_game_loop(mines, counts, revealed, flags, get_action):
                 continue
             safe = handle_click(r, c, counts, mines, revealed, flags)
             if not safe:
-                print("\nBOOM — you clicked a mine! Game over.\n")
-                print_board(mines, counts, revealed, flags, reveal_all=True)
+                if show_board:
+                    print("\nBOOM — you clicked a mine! Game over.\n")
+                    print_board(mines, counts, revealed, flags, reveal_all=True)
                 return False
             else:
                 # safe click; loop will check for win on next iteration

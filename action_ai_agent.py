@@ -15,7 +15,7 @@ def count_adjacent_flags(board_size, r, c, flags):
     return cnt
 
 
-def dfs_get_action(board_size, revealed, flags, counts):
+def dfs_get_action(board_size, revealed, flags, counts, show_board=True):
     """
     An automated action provider using Depth First Search (DFS).
 
@@ -155,24 +155,27 @@ def dfs_get_action(board_size, revealed, flags, counts):
         if safe_cells:
             # random tie-break
             r, c = random.choice(safe_cells)
-            print(f"\nI am clicking on ({r + 1}, {c + 1}) [DFS 100% Safe] ...")
+            if show_board:
+                print(f"\nI am clicking on ({r + 1}, {c + 1}) [DFS 100% Safe] ...")
             return 'c', r, c
 
         # priority 2: If there are guaranteed mines, flag one
         if mine_cells:
             # random tie-break
             r, c = random.choice(mine_cells)
-            print(f"\nI am flagging ({r + 1}, {c + 1}) [DFS 100% Mine] ...")
+            if show_board:
+                print(f"\nI am flagging ({r + 1}, {c + 1}) [DFS 100% Mine] ...")
             return 'f', r, c
 
     # last resort:
     # clicking randomly (triggered if DFS failed to find any action with 100% certainty)
     r, c = random.choice(candidates)
-    print(f"\nI am clicking on ({r + 1}, {c + 1}) [Random Fallback] ...")
+    if show_board:
+        print(f"\nI am clicking on ({r + 1}, {c + 1}) [Random Fallback] ...")
 
     return 'c', r, c
 
-def ai_get_action(board_size, revealed, flags, counts):
+def ai_get_action(board_size, revealed, flags, counts, show_board=True):
     """
     An automated action provider using a few heuristics.
 
@@ -335,16 +338,17 @@ def ai_get_action(board_size, revealed, flags, counts):
 
     (success, action, r, c) = heuristic_result
 
-    print()
-    if action == 'c':
-       print(f"I am clicking on ({r+1}, {c+1}) ...")
-    elif action == 'f':
-       print(f"I am flagging ({r+1}, {c+1}) ...")
+    if show_board:
+        print()
+        if action == 'c':
+           print(f"I am clicking on ({r+1}, {c+1}) ...")
+        elif action == 'f':
+           print(f"I am flagging ({r+1}, {c+1}) ...")
 
     return action, r, c
 
 
-def random_get_action(board_size, revealed, flags, counts):
+def random_get_action(board_size, revealed, flags, counts, show_board=True):
     """
     Random automated action provider.
 
@@ -363,6 +367,7 @@ def random_get_action(board_size, revealed, flags, counts):
 
     r, c = random.choice(candidates)
 
-    print(f"I am clicking on ({r}, {c}) ...")
+    if show_board:
+        print(f"I am clicking on ({r}, {c}) ...")
 
     return 'c', r, c
