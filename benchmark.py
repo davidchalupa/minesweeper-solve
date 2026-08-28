@@ -1,7 +1,8 @@
 import random
 from collections import deque
 from common import neighbors
-from action_ai_agent import ai_get_action, dfs_get_action
+from action_ai_agent import ai_get_action, dfs_get_action, random_get_action
+# from action_ai_agent import random_get_action
 from minesweeper import place_mines, compute_counts, handle_click, run_game_loop
 
 
@@ -25,8 +26,10 @@ def benchmark_agent(num_games, agent_name, get_action):
 
 def main():
     num_games = 5000
+    # random_success = benchmark_agent(num_games, "Random", random_get_action)
     rule_based_success = benchmark_agent(num_games, "Rule-based", ai_get_action)
     dfs_success = benchmark_agent(num_games, "DFS", dfs_get_action)
+    # print(f"Random move success rate: {random_success / num_games * 100:.2f}%")
     print(f"Rule-based agent success rate: {rule_based_success / num_games * 100:.2f}%")
     print(f"DFS agent success rate: {dfs_success / num_games * 100:.2f}%")
 
